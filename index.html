@@ -1,1 +1,648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <title>Control de Ingreso - Graduación 2026</title>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      color: #333;
+    }
+
+    .contenedor {
+      width: 100%;
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .encabezado {
+      background: #494949;
+      color: white;
+      text-align: center;
+      padding: 20px 15px;
+      border-radius: 0 0 15px 15px;
+    }
+
+    .encabezado h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .encabezado p {
+      margin: 8px 0 0;
+      font-size: 14px;
+    }
+
+    .tarjeta {
+      background: white;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+    }
+
+    #reader {
+      width: 100%;
+      display: none;
+      margin-top: 15px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .boton-camara {
+      background: #d0242e;
+      color: white;
+    }
+
+    .boton-manual {
+      background: #494949;
+      color: white;
+    }
+
+    .boton-siguiente {
+      background: #5794cd;
+      color: white;
+      display: none;
+    }
+
+    input {
+      width: 100%;
+      padding: 15px;
+      font-size: 18px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      margin-top: 10px;
+      text-transform: uppercase;
+    }
+
+    #resultado {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    #resultado h2 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    #resultado p {
+      margin: 8px 0;
+      font-size: 17px;
+    }
+
+    .valido {
+      background: #dff5e1;
+      border: 2px solid #2e9b42;
+      color: #176b27;
+    }
+
+    .utilizado {
+      background: #fff0d6;
+      border: 2px solid #e39a24;
+      color: #8a5700;
+    }
+
+    .invalido {
+      background: #ffe0e0;
+      border: 2px solid #d0242e;
+      color: #a00000;
+    }
+
+    .error {
+      background: #ffe0e0;
+      border: 2px solid #d0242e;
+      color: #a00000;
+    }
+
+    .manual {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .codigo {
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: bold;
+      word-break: break-all;
+    }
+
+    .pie {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="encabezado">
+    <h1>GRADUACIÓN 2026</h1>
+    <p>Control de ingreso</p>
+  </div>
+
+  <div class="contenedor">
+
+    <div class="tarjeta">
+
+      <button
+        id="botonCamara"
+        class="boton-camara"
+        onclick="iniciarCamara()">
+        📷 ESCANEAR CÓDIGO QR
+      </button>
+
+      <div id="reader"></div>
+
+      <div class="manual" id="manual">
+
+        <p><strong>Ingreso manual</strong></p>
+
+        <input
+          id="codigoManual"
+          type="text"
+          placeholder="Ingrese el código QR">
+
+        <button
+          class="boton-manual"
+          onclick="verificarManual()">
+          VERIFICAR CÓDIGO
+        </button>
+
+      </div>
+
+      <button
+        id="botonSiguiente"
+        class="boton-siguiente"
+        onclick="reiniciarScanner()">
+        📷 ESCANEAR SIGUIENTE
+      </button>
+
+      <div id="resultado"></div>
+
+    </div>
+
+    <div class="pie">
+      Instituto Austriaco Guatemalteco
+    </div>
+
+  </div>
+
+
+<script>
+
+  /*
+   * URL DEL WEB APP DE APPS SCRIPT
+   */
+  const API_URL =
+    'https://script.google.com/macros/s/AKfycbzP9Rh8scA0spR1HQve7-1mzdgBnZD_j3fZ0K2vjZZ3pTB6MnD7yDeSbackd2WbDdWJ/exec';
+
+
+  let scanner = null;
+  let procesando = false;
+
+
+  /*
+   * INICIAR CÁMARA
+   */
+  async function iniciarCamara() {
+
+    document.getElementById('resultado').style.display = 'none';
+
+    document.getElementById('reader').style.display = 'block';
+
+    document.getElementById('botonCamara').style.display = 'none';
+
+    document.getElementById('manual').style.display = 'none';
+
+    document.getElementById('botonSiguiente').style.display = 'none';
+
+    procesando = false;
+
+    try {
+
+      scanner = new Html5Qrcode("reader");
+
+      const cameras =
+        await Html5Qrcode.getCameras();
+
+      if (!cameras || cameras.length === 0) {
+
+        mostrarError(
+          'No se encontró ninguna cámara en este dispositivo.'
+        );
+
+        mostrarManual();
+
+        return;
+      }
+
+      /*
+       * Buscar preferentemente la cámara trasera
+       */
+      let camaraSeleccionada =
+        cameras[cameras.length - 1].id;
+
+      for (const camara of cameras) {
+
+        const nombre =
+          (camara.label || '').toLowerCase();
+
+        if (
+          nombre.includes('back') ||
+          nombre.includes('rear') ||
+          nombre.includes('trasera') ||
+          nombre.includes('environment')
+        ) {
+          camaraSeleccionada = camara.id;
+          break;
+        }
+      }
+
+
+      await scanner.start(
+        camaraSeleccionada,
+        {
+          fps: 10,
+          qrbox: {
+            width: 250,
+            height: 250
+          }
+        },
+        codigoDetectado,
+        () => {}
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+      mostrarError(
+        'No se pudo acceder a la cámara. ' +
+        'Verifique que el navegador tenga permiso para usarla.'
+      );
+
+      mostrarManual();
+    }
+  }
+
+
+  /*
+   * CUANDO SE DETECTA UN QR
+   */
+  function codigoDetectado(codigo) {
+
+    if (procesando) {
+      return;
+    }
+
+    procesando = true;
+
+    detenerCamara();
+
+    verificarCodigo(codigo);
+  }
+
+
+  /*
+   * DETENER CÁMARA
+   */
+  async function detenerCamara() {
+
+    if (scanner) {
+
+      try {
+        await scanner.stop();
+      } catch (error) {
+        console.log(error);
+      }
+
+      scanner.clear();
+
+      scanner = null;
+    }
+
+    document.getElementById('reader').style.display = 'none';
+  }
+
+
+  /*
+   * VERIFICAR QR
+   */
+  function verificarCodigo(codigo) {
+
+    codigo =
+      String(codigo)
+        .trim()
+        .toUpperCase();
+
+    if (!codigo) {
+
+      mostrarError(
+        'Debe ingresar un código.'
+      );
+
+      procesando = false;
+
+      return;
+    }
+
+
+    mostrarCargando();
+
+
+    const callback =
+      'respuestaQR_' +
+      Date.now();
+
+
+    window[callback] =
+      function(resultado) {
+
+        mostrarResultado(resultado);
+
+        delete window[callback];
+      };
+
+
+    const script =
+      document.createElement('script');
+
+
+    script.src =
+      API_URL +
+      '?action=verificar' +
+      '&codigo=' +
+      encodeURIComponent(codigo) +
+      '&callback=' +
+      callback;
+
+
+    script.onerror =
+      function() {
+
+        mostrarError(
+          'No fue posible comunicarse con el sistema.'
+        );
+
+        delete window[callback];
+
+        script.remove();
+
+        procesando = false;
+      };
+
+
+    document.body.appendChild(script);
+
+
+    setTimeout(function() {
+
+      script.remove();
+
+    }, 10000);
+  }
+
+
+  /*
+   * INGRESO MANUAL
+   */
+  function verificarManual() {
+
+    const codigo =
+      document.getElementById(
+        'codigoManual'
+      ).value;
+
+    verificarCodigo(codigo);
+  }
+
+
+  /*
+   * MOSTRAR RESULTADO
+   */
+  function mostrarResultado(resultado) {
+
+    const caja =
+      document.getElementById('resultado');
+
+    caja.style.display = 'block';
+
+    caja.className = '';
+
+
+    if (resultado.estado === 'VALIDO') {
+
+      caja.classList.add('valido');
+
+      caja.innerHTML = `
+        <h2>INGRESO AUTORIZADO</h2>
+
+        <p>
+          <strong>Invitado:</strong><br>
+          ${escapeHTML(resultado.invitado)}
+        </p>
+
+        <p>
+          <strong>Graduando:</strong><br>
+          ${escapeHTML(resultado.graduando)}
+        </p>
+      `;
+
+      document.getElementById(
+        'botonSiguiente'
+      ).style.display = 'block';
+
+    }
+
+
+    else if (resultado.estado === 'UTILIZADO') {
+
+      caja.classList.add('utilizado');
+
+      caja.innerHTML = `
+        <h2>QR YA UTILIZADO</h2>
+
+        <p>
+          Este código ya fue registrado anteriormente.
+        </p>
+
+        <p>
+          <strong>Invitado:</strong><br>
+          ${escapeHTML(resultado.invitado)}
+        </p>
+
+        <p>
+          <strong>Graduando:</strong><br>
+          ${escapeHTML(resultado.graduando)}
+        </p>
+      `;
+
+      document.getElementById(
+        'botonSiguiente'
+      ).style.display = 'block';
+
+    }
+
+
+    else if (resultado.estado === 'INVALIDO') {
+
+      caja.classList.add('invalido');
+
+      caja.innerHTML = `
+        <h2>QR NO VÁLIDO</h2>
+
+        <p>
+          El código no pertenece a una invitación registrada.
+        </p>
+      `;
+
+      document.getElementById(
+        'botonSiguiente'
+      ).style.display = 'block';
+
+    }
+
+
+    else {
+
+      mostrarError(
+        resultado.mensaje ||
+        'Ocurrió un error al verificar el código.'
+      );
+
+      return;
+    }
+
+
+    procesando = false;
+  }
+
+
+  /*
+   * PANTALLA DE CARGA
+   */
+  function mostrarCargando() {
+
+    const caja =
+      document.getElementById('resultado');
+
+    caja.style.display = 'block';
+
+    caja.className = '';
+
+    caja.innerHTML = `
+      <h2>VERIFICANDO...</h2>
+      <p>Espere un momento.</p>
+    `;
+  }
+
+
+  /*
+   * ERROR
+   */
+  function mostrarError(mensaje) {
+
+    const caja =
+      document.getElementById('resultado');
+
+    caja.style.display = 'block';
+
+    caja.className = 'error';
+
+    caja.innerHTML = `
+      <h2>ERROR</h2>
+      <p>${escapeHTML(mensaje)}</p>
+    `;
+
+    document.getElementById(
+      'botonSiguiente'
+    ).style.display = 'block';
+
+    procesando = false;
+  }
+
+
+  /*
+   * MOSTRAR OPCIÓN MANUAL
+   */
+  function mostrarManual() {
+
+    document.getElementById(
+      'manual'
+    ).style.display = 'block';
+
+    document.getElementById(
+      'botonCamara'
+    ).style.display = 'block';
+  }
+
+
+  /*
+   * REINICIAR PARA EL SIGUIENTE INVITADO
+   */
+  function reiniciarScanner() {
+
+    document.getElementById(
+      'resultado'
+    ).style.display = 'none';
+
+    document.getElementById(
+      'botonSiguiente'
+    ).style.display = 'none';
+
+    document.getElementById(
+      'codigoManual'
+    ).value = '';
+
+    procesando = false;
+
+    iniciarCamara();
+  }
+
+
+  /*
+   * PROTEGER TEXTO HTML
+   */
+  function escapeHTML(texto) {
+
+    const div =
+      document.createElement('div');
+
+    div.textContent =
+      texto || '';
+
+    return div.innerHTML;
+  }
+
+</script>
+
+</body>
+</html>
