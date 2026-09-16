@@ -356,23 +356,126 @@
   /*
    * VERIFICAR QR
    */
-  function verificarCodigo(codigo) {
+function verificarCodigo(codigo) {
 
-    codigo =
-      String(codigo)
-        .trim()
-        .toUpperCase();
+  codigo = String(codigo)
+    .trim()
+    .toUpperCase();
 
-    if (!codigo) {
+  if (!codigo) {
 
-      mostrarError(
-        'Debe ingresar un código.'
-      );
+    mostrarError('Debe ingresar un código.');
 
-      procesando = false;
+    procesando = false;
 
+    return;
+  }
+
+  mostrarCargando();
+
+  const callback =
+    'respuestaQR_' + Date.now();
+
+  let terminado = false;
+
+  const script =
+    document.createElement('script');
+
+
+  /*
+   * FUNCIÓN DE RESPUESTA
+   */
+  window[callback] = function(resultado) {
+
+    if (terminado) {
       return;
     }
+
+    terminado = true;
+
+    clearTimeout(timeout);
+
+    mostrarResultado(resultado);
+
+    delete window[callback];
+
+    if (script.parentNode) {
+      script.remove();
+    }
+  };
+
+
+  /*
+   * SI LA CONEXIÓN FALLA
+   */
+  script.onerror = function() {
+
+    if (terminado) {
+      return;
+    }
+
+    terminado = true;
+
+    clearTimeout(timeout);
+
+    delete window[callback];
+
+    if (script.parentNode) {
+      script.remove();
+    }
+
+    mostrarError(
+      'No fue posible comunicarse con el sistema. ' +
+      'Intente nuevamente.'
+    );
+  };
+
+
+  /*
+   * CONSTRUIR SOLICITUD
+   */
+  script.src =
+    API_URL +
+    '?action=verificar' +
+    '&codigo=' +
+    encodeURIComponent(codigo) +
+    '&callback=' +
+    callback;
+
+
+  /*
+   * TIEMPO MÁXIMO DE ESPERA
+   *
+   * Antes: 10 segundos
+   * Ahora: 20 segundos
+   */
+  const timeout = setTimeout(function() {
+
+    if (terminado) {
+      return;
+    }
+
+    terminado = true;
+
+    delete window[callback];
+
+    if (script.parentNode) {
+      script.remove();
+    }
+
+    mostrarError(
+      'El sistema está tardando demasiado en responder. ' +
+      'Verifique su conexión e intente nuevamente.'
+    );
+
+  }, 20000);
+
+
+  /*
+   * ENVIAR SOLICITUD
+   */
+  document.body.appendChild(script);
+}
 
 
     mostrarCargando();
@@ -549,20 +652,21 @@
   /*
    * PANTALLA DE CARGA
    */
-  function mostrarCargando() {
+function mostrarCargando() {
 
-    const caja =
-      document.getElementById('resultado');
+  const caja =
+    document.getElementById('resultado');
 
-    caja.style.display = 'block';
+  caja.style.display = 'block';
 
-    caja.className = '';
+  caja.className = '';
 
-    caja.innerHTML = `
-      <h2>VERIFICANDO...</h2>
-      <p>Espere un momento.</p>
-    `;
-  }
+  caja.innerHTML = `
+    <h2>VERIFICANDO...</h2>
+    <p>🔄 Conectando con el sistema.</p>
+    <p>Por favor espere...</p>
+  `;
+}
 
 
   /*
