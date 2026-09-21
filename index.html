@@ -180,7 +180,7 @@
    * editar → nueva versión" para conservar esta MISMA URL.
    * ============================================================ */
   const API_URL =
-    'https://script.google.com/macros/s/AKfycbwzkzrCx5H-fJyRyCCse7tI_RHswKyGt7tLXyAw2-3e3iPh-h2mXLKjhXeohpKRx8ni/exec';
+    'https://script.google.com/macros/s/AKfycbyPyA9UiT24hu0BFAwVvYWt6eZcHL-2pKBjLqcHeArVxHnXOXTBhGZUnKzZHCaGzA/exec';
 
   const TIMEOUT_MS = 20000;
 
@@ -321,7 +321,10 @@
         setTimeout(function() { verificarCodigo(codigo, intento + 1); }, 400);
       } else {
         mostrarError(
-          'No fue posible comunicarse con el sistema. Verifique la conexión.'
+          'No fue posible comunicarse con el sistema.<br><br>' +
+          '<em>Vuelva a escanear este mismo código. Si aparece ' +
+          '"YA UTILIZADO", el ingreso SÍ quedó registrado y la ' +
+          'persona puede pasar.</em>'
         );
       }
     };
