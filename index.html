@@ -6,12 +6,15 @@
 
   <title>Control de Ingreso - Graduación 2026</title>
 
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <!--
+    Librería de lectura de QR (html5-qrcode 2.3.8), hospedada LOCALMENTE en este repo.
+    El archivo html5-qrcode.min.js debe estar en la MISMA carpeta que este index.html.
+    Así el lector NO depende de ningún CDN externo el día del evento.
+  -->
+  <script src="./html5-qrcode.min.js"></script>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -35,15 +38,8 @@
       border-radius: 0 0 15px 15px;
     }
 
-    .encabezado h1 {
-      margin: 0;
-      font-size: 22px;
-    }
-
-    .encabezado p {
-      margin: 8px 0 0;
-      font-size: 14px;
-    }
+    .encabezado h1 { margin: 0; font-size: 22px; }
+    .encabezado p  { margin: 8px 0 0; font-size: 14px; }
 
     .tarjeta {
       background: white;
@@ -72,20 +68,18 @@
       margin-top: 10px;
     }
 
-    .boton-camara {
-      background: #d0242e;
-      color: white;
-    }
+    .boton-camara    { background: #d0242e; color: white; }
+    .boton-manual    { background: #494949; color: white; }
+    .boton-siguiente { background: #5794cd; color: white; display: none; }
 
-    .boton-manual {
-      background: #494949;
-      color: white;
-    }
-
-    .boton-siguiente {
-      background: #5794cd;
-      color: white;
-      display: none;
+    .enlace-manual {
+      display: block;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #5794cd;
+      text-decoration: underline;
+      cursor: pointer;
     }
 
     input {
@@ -106,50 +100,23 @@
       text-align: center;
     }
 
-    #resultado h2 {
-      margin-top: 0;
-      font-size: 24px;
-    }
+    #resultado h2 { margin-top: 0; font-size: 24px; }
+    #resultado p  { margin: 8px 0; font-size: 17px; }
 
-    #resultado p {
-      margin: 8px 0;
-      font-size: 17px;
-    }
+    .valido    { background: #dff5e1; border: 2px solid #2e9b42; color: #176b27; }
+    .utilizado { background: #fff0d6; border: 2px solid #e39a24; color: #8a5700; }
+    .invalido  { background: #ffe0e0; border: 2px solid #d0242e; color: #a00000; }
+    .error     { background: #ffe0e0; border: 2px solid #d0242e; color: #a00000; }
+    .cargando  { background: #eef4fb; border: 2px solid #5794cd; color: #2c5a8a; }
 
-    .valido {
-      background: #dff5e1;
-      border: 2px solid #2e9b42;
-      color: #176b27;
-    }
-
-    .utilizado {
-      background: #fff0d6;
-      border: 2px solid #e39a24;
-      color: #8a5700;
-    }
-
-    .invalido {
-      background: #ffe0e0;
-      border: 2px solid #d0242e;
-      color: #a00000;
-    }
-
-    .error {
-      background: #ffe0e0;
-      border: 2px solid #d0242e;
-      color: #a00000;
-    }
-
-    .manual {
-      display: none;
-      margin-top: 15px;
-    }
+    .manual { display: none; margin-top: 15px; }
 
     .codigo {
       font-family: monospace;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       word-break: break-all;
+      opacity: 0.8;
     }
 
     .pie {
@@ -172,36 +139,24 @@
 
     <div class="tarjeta">
 
-      <button
-        id="botonCamara"
-        class="boton-camara"
-        onclick="iniciarCamara()">
+      <button id="botonCamara" class="boton-camara" onclick="iniciarCamara()">
         📷 ESCANEAR CÓDIGO QR
       </button>
 
       <div id="reader"></div>
 
+      <span class="enlace-manual" id="enlaceManual" onclick="toggleManual()">
+        Ingresar código manualmente
+      </span>
+
       <div class="manual" id="manual">
-
-        <p><strong>Ingreso manual</strong></p>
-
-        <input
-          id="codigoManual"
-          type="text"
-          placeholder="Ingrese el código QR">
-
-        <button
-          class="boton-manual"
-          onclick="verificarManual()">
+        <input id="codigoManual" type="text" placeholder="Ingrese el código (IAG-2026-...)">
+        <button class="boton-manual" onclick="verificarManual()">
           VERIFICAR CÓDIGO
         </button>
-
       </div>
 
-      <button
-        id="botonSiguiente"
-        class="boton-siguiente"
-        onclick="reiniciarScanner()">
+      <button id="botonSiguiente" class="boton-siguiente" onclick="reiniciarScanner()">
         📷 ESCANEAR SIGUIENTE
       </button>
 
@@ -218,531 +173,301 @@
 
 <script>
 
-  /*
+  /* ============================================================
    * URL DEL WEB APP DE APPS SCRIPT
-   */
+   * Reemplázala por la URL /exec de tu implementación ACTUAL.
+   * Al actualizar el script usa "Administrar implementaciones →
+   * editar → nueva versión" para conservar esta MISMA URL.
+   * ============================================================ */
   const API_URL =
     'https://script.google.com/macros/s/AKfycbzxvNZ-nyQwMsO7okkfzeAzRKeXaLkMUlbrsJLObCVS2_6osSBCJgrBJZhLUKQR1Fg/exec';
 
+  const TIMEOUT_MS = 20000;
 
-  let scanner = null;
+  let scanner    = null;
   let procesando = false;
 
 
-  /*
+  /* ------------------------------------------------------------
    * INICIAR CÁMARA
-   */
+   * ---------------------------------------------------------- */
   async function iniciarCamara() {
 
-    document.getElementById('resultado').style.display = 'none';
-
-    document.getElementById('reader').style.display = 'block';
-
-    document.getElementById('botonCamara').style.display = 'none';
-
-    document.getElementById('manual').style.display = 'none';
-
+    document.getElementById('resultado').style.display      = 'none';
+    document.getElementById('reader').style.display         = 'block';
+    document.getElementById('botonCamara').style.display    = 'none';
+    document.getElementById('manual').style.display         = 'none';
+    document.getElementById('enlaceManual').style.display   = 'none';
     document.getElementById('botonSiguiente').style.display = 'none';
 
     procesando = false;
 
     try {
 
-      scanner = new Html5Qrcode("reader");
+      scanner = new Html5Qrcode('reader');
 
-      const cameras =
-        await Html5Qrcode.getCameras();
+      const cameras = await Html5Qrcode.getCameras();
 
       if (!cameras || cameras.length === 0) {
-
-        mostrarError(
-          'No se encontró ninguna cámara en este dispositivo.'
-        );
-
+        mostrarError('No se encontró ninguna cámara en este dispositivo.');
         mostrarManual();
-
         return;
       }
 
-      /*
-       * Buscar preferentemente la cámara trasera
-       */
-      let camaraSeleccionada =
-        cameras[cameras.length - 1].id;
+      // Preferir la cámara trasera
+      let camaraSeleccionada = cameras[cameras.length - 1].id;
 
       for (const camara of cameras) {
-
-        const nombre =
-          (camara.label || '').toLowerCase();
-
-        if (
-          nombre.includes('back') ||
-          nombre.includes('rear') ||
-          nombre.includes('trasera') ||
-          nombre.includes('environment')
-        ) {
+        const nombre = (camara.label || '').toLowerCase();
+        if (nombre.includes('back')    ||
+            nombre.includes('rear')    ||
+            nombre.includes('trasera') ||
+            nombre.includes('environment')) {
           camaraSeleccionada = camara.id;
           break;
         }
       }
 
-
       await scanner.start(
         camaraSeleccionada,
-        {
-          fps: 10,
-          qrbox: {
-            width: 250,
-            height: 250
-          }
-        },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         codigoDetectado,
-        () => {}
+        () => {}   // ignorar frames sin QR
       );
 
     } catch (error) {
-
       console.error(error);
-
       mostrarError(
         'No se pudo acceder a la cámara. ' +
         'Verifique que el navegador tenga permiso para usarla.'
       );
-
       mostrarManual();
     }
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * CUANDO SE DETECTA UN QR
-   */
+   * ---------------------------------------------------------- */
   function codigoDetectado(codigo) {
-
-    if (procesando) {
-      return;
-    }
-
+    if (procesando) return;
     procesando = true;
-
     detenerCamara();
-
     verificarCodigo(codigo);
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * DETENER CÁMARA
-   */
+   * ---------------------------------------------------------- */
   async function detenerCamara() {
-
     if (scanner) {
-
-      try {
-        await scanner.stop();
-      } catch (error) {
-        console.log(error);
-      }
-
-      scanner.clear();
-
+      try { await scanner.stop(); } catch (error) { console.log(error); }
+      try { scanner.clear(); } catch (error) { console.log(error); }
       scanner = null;
     }
-
     document.getElementById('reader').style.display = 'none';
   }
 
 
-  /*
-   * VERIFICAR QR
-   */
-function verificarCodigo(codigo) {
+  /* ------------------------------------------------------------
+   * VERIFICAR CÓDIGO (una sola implementación, vía JSONP)
+   * ---------------------------------------------------------- */
+  function verificarCodigo(codigo) {
 
-  codigo = String(codigo)
-    .trim()
-    .toUpperCase();
+    codigo = String(codigo).trim().toUpperCase();
 
-  if (!codigo) {
-
-    mostrarError('Debe ingresar un código.');
-
-    procesando = false;
-
-    return;
-  }
-
-  mostrarCargando();
-
-  const callback =
-    'respuestaQR_' + Date.now();
-
-  let terminado = false;
-
-  const script =
-    document.createElement('script');
-
-
-  /*
-   * FUNCIÓN DE RESPUESTA
-   */
-  window[callback] = function(resultado) {
-
-    if (terminado) {
+    if (!codigo) {
+      mostrarError('Debe ingresar un código.');
+      procesando = false;
       return;
     }
-
-    terminado = true;
-
-    clearTimeout(timeout);
-
-    mostrarResultado(resultado);
-
-    delete window[callback];
-
-    if (script.parentNode) {
-      script.remove();
-    }
-  };
-
-
-  /*
-   * SI LA CONEXIÓN FALLA
-   */
-  script.onerror = function() {
-
-    if (terminado) {
-      return;
-    }
-
-    terminado = true;
-
-    clearTimeout(timeout);
-
-    delete window[callback];
-
-    if (script.parentNode) {
-      script.remove();
-    }
-
-    mostrarError(
-      'No fue posible comunicarse con el sistema. ' +
-      'Intente nuevamente.'
-    );
-  };
-
-
-  /*
-   * CONSTRUIR SOLICITUD
-   */
-  script.src =
-    API_URL +
-    '?action=verificar' +
-    '&codigo=' +
-    encodeURIComponent(codigo) +
-    '&callback=' +
-    callback;
-
-
-  /*
-   * TIEMPO MÁXIMO DE ESPERA
-   *
-   * Antes: 10 segundos
-   * Ahora: 20 segundos
-   */
-  const timeout = setTimeout(function() {
-
-    if (terminado) {
-      return;
-    }
-
-    terminado = true;
-
-    delete window[callback];
-
-    if (script.parentNode) {
-      script.remove();
-    }
-
-    mostrarError(
-      'El sistema está tardando demasiado en responder. ' +
-      'Verifique su conexión e intente nuevamente.'
-    );
-
-  }, 20000);
-
-
-  /*
-   * ENVIAR SOLICITUD
-   */
-  document.body.appendChild(script);
-}
-
 
     mostrarCargando();
 
+    const callback = 'respuestaQR_' + Date.now() +
+                     '_' + Math.floor(Math.random() * 100000);
 
-    const callback =
-      'respuestaQR_' +
-      Date.now();
+    const script   = document.createElement('script');
+    let   terminado = false;
 
+    // Limpieza común
+    function limpiar() {
+      clearTimeout(timeout);
+      try { delete window[callback]; } catch (e) { window[callback] = undefined; }
+      if (script.parentNode) script.remove();
+    }
 
-    window[callback] =
-      function(resultado) {
+    // Respuesta correcta del servidor
+    window[callback] = function(resultado) {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      mostrarResultado(resultado, codigo);
+    };
 
-        mostrarResultado(resultado);
+    // Falla de conexión / carga
+    script.onerror = function() {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      mostrarError(
+        'No fue posible comunicarse con el sistema. Verifique la conexión.'
+      );
+    };
 
-        delete window[callback];
-      };
+    // Tiempo máximo de espera
+    const timeout = setTimeout(function() {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      mostrarError(
+        'El sistema tardó demasiado en responder.<br><br>' +
+        '<em>Si la conexión se cortó al final, es posible que el ingreso ' +
+        'SÍ se haya registrado. Al reescanear, un aviso de ' +
+        '"YA UTILIZADO" confirma que la persona ya pasó.</em>'
+      );
+    }, TIMEOUT_MS);
 
-
-    const script =
-      document.createElement('script');
-
-
+    // Construir y enviar la solicitud
     script.src =
       API_URL +
       '?action=verificar' +
-      '&codigo=' +
-      encodeURIComponent(codigo) +
-      '&callback=' +
-      callback;
-
-
-    script.onerror =
-      function() {
-
-        mostrarError(
-          'No fue posible comunicarse con el sistema.'
-        );
-
-        delete window[callback];
-
-        script.remove();
-
-        procesando = false;
-      };
-
+      '&codigo='   + encodeURIComponent(codigo) +
+      '&callback=' + callback +
+      '&_=' + Date.now();   // evita cualquier caché
 
     document.body.appendChild(script);
-
-
-    setTimeout(function() {
-
-      script.remove();
-
-    }, 10000);
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * INGRESO MANUAL
-   */
+   * ---------------------------------------------------------- */
   function verificarManual() {
-
-    const codigo =
-      document.getElementById(
-        'codigoManual'
-      ).value;
-
+    const codigo = document.getElementById('codigoManual').value;
+    procesando = true;
     verificarCodigo(codigo);
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * MOSTRAR RESULTADO
-   */
-  function mostrarResultado(resultado) {
+   * ---------------------------------------------------------- */
+  function mostrarResultado(resultado, codigo) {
 
-    const caja =
-      document.getElementById('resultado');
-
+    const caja = document.getElementById('resultado');
     caja.style.display = 'block';
-
     caja.className = '';
 
+    const lineaCodigo = codigo
+      ? '<p class="codigo">Código: ' + escapeHTML(codigo) + '</p>'
+      : '';
 
     if (resultado.estado === 'VALIDO') {
-
       caja.classList.add('valido');
-
       caja.innerHTML = `
-        <h2>INGRESO AUTORIZADO</h2>
-
-        <p>
-          <strong>Invitado:</strong><br>
-          ${escapeHTML(resultado.invitado)}
-        </p>
-
-        <p>
-          <strong>Graduando:</strong><br>
-          ${escapeHTML(resultado.graduando)}
-        </p>
+        <h2>✅ INGRESO AUTORIZADO</h2>
+        <p><strong>Invitado:</strong><br>${escapeHTML(resultado.invitado)}</p>
+        <p><strong>Graduando:</strong><br>${escapeHTML(resultado.graduando)}</p>
+        ${lineaCodigo}
       `;
-
-      document.getElementById(
-        'botonSiguiente'
-      ).style.display = 'block';
-
     }
-
-
     else if (resultado.estado === 'UTILIZADO') {
-
       caja.classList.add('utilizado');
-
       caja.innerHTML = `
-        <h2>QR YA UTILIZADO</h2>
-
-        <p>
-          Este código ya fue registrado anteriormente.
-        </p>
-
-        <p>
-          <strong>Invitado:</strong><br>
-          ${escapeHTML(resultado.invitado)}
-        </p>
-
-        <p>
-          <strong>Graduando:</strong><br>
-          ${escapeHTML(resultado.graduando)}
-        </p>
+        <h2>⚠️ QR YA UTILIZADO</h2>
+        <p>Este código ya fue registrado anteriormente.</p>
+        <p><strong>Invitado:</strong><br>${escapeHTML(resultado.invitado)}</p>
+        <p><strong>Graduando:</strong><br>${escapeHTML(resultado.graduando)}</p>
+        ${lineaCodigo}
       `;
-
-      document.getElementById(
-        'botonSiguiente'
-      ).style.display = 'block';
-
     }
-
-
     else if (resultado.estado === 'INVALIDO') {
-
       caja.classList.add('invalido');
-
       caja.innerHTML = `
-        <h2>QR NO VÁLIDO</h2>
-
-        <p>
-          El código no pertenece a una invitación registrada.
-        </p>
+        <h2>❌ QR NO VÁLIDO</h2>
+        <p>El código no pertenece a una invitación registrada.</p>
+        ${lineaCodigo}
       `;
-
-      document.getElementById(
-        'botonSiguiente'
-      ).style.display = 'block';
-
     }
-
-
     else {
-
-      mostrarError(
-        resultado.mensaje ||
-        'Ocurrió un error al verificar el código.'
-      );
-
+      mostrarError(resultado.mensaje || 'Ocurrió un error al verificar el código.');
       return;
     }
 
-
+    document.getElementById('botonSiguiente').style.display = 'block';
     procesando = false;
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * PANTALLA DE CARGA
-   */
-function mostrarCargando() {
-
-  const caja =
-    document.getElementById('resultado');
-
-  caja.style.display = 'block';
-
-  caja.className = '';
-
-  caja.innerHTML = `
-    <h2>VERIFICANDO...</h2>
-    <p>🔄 Conectando con el sistema.</p>
-    <p>Por favor espere...</p>
-  `;
-}
-
-
-  /*
-   * ERROR
-   */
-  function mostrarError(mensaje) {
-
-    const caja =
-      document.getElementById('resultado');
-
+   * ---------------------------------------------------------- */
+  function mostrarCargando() {
+    const caja = document.getElementById('resultado');
     caja.style.display = 'block';
-
-    caja.className = 'error';
-
+    caja.className = 'cargando';
     caja.innerHTML = `
-      <h2>ERROR</h2>
-      <p>${escapeHTML(mensaje)}</p>
+      <h2>VERIFICANDO…</h2>
+      <p>🔄 Conectando con el sistema.</p>
     `;
+  }
 
-    document.getElementById(
-      'botonSiguiente'
-    ).style.display = 'block';
 
+  /* ------------------------------------------------------------
+   * ERROR
+   * ---------------------------------------------------------- */
+  function mostrarError(mensaje) {
+    const caja = document.getElementById('resultado');
+    caja.style.display = 'block';
+    caja.className = 'error';
+    caja.innerHTML = `<h2>ERROR</h2><p>${mensaje}</p>`;
+    document.getElementById('botonSiguiente').style.display = 'block';
     procesando = false;
   }
 
 
-  /*
-   * MOSTRAR OPCIÓN MANUAL
-   */
+  /* ------------------------------------------------------------
+   * MOSTRAR OPCIÓN MANUAL (cuando falla la cámara)
+   * ---------------------------------------------------------- */
   function mostrarManual() {
-
-    document.getElementById(
-      'manual'
-    ).style.display = 'block';
-
-    document.getElementById(
-      'botonCamara'
-    ).style.display = 'block';
+    document.getElementById('manual').style.display       = 'block';
+    document.getElementById('botonCamara').style.display  = 'block';
+    document.getElementById('enlaceManual').style.display = 'block';
   }
 
 
-  /*
+  /* ------------------------------------------------------------
+   * TOGGLE del ingreso manual (enlace)
+   * ---------------------------------------------------------- */
+  function toggleManual() {
+    const manual = document.getElementById('manual');
+    manual.style.display = (manual.style.display === 'block') ? 'none' : 'block';
+    if (manual.style.display === 'block') {
+      document.getElementById('codigoManual').focus();
+    }
+  }
+
+
+  /* ------------------------------------------------------------
    * REINICIAR PARA EL SIGUIENTE INVITADO
-   */
+   * ---------------------------------------------------------- */
   function reiniciarScanner() {
-
-    document.getElementById(
-      'resultado'
-    ).style.display = 'none';
-
-    document.getElementById(
-      'botonSiguiente'
-    ).style.display = 'none';
-
-    document.getElementById(
-      'codigoManual'
-    ).value = '';
-
+    document.getElementById('resultado').style.display      = 'none';
+    document.getElementById('botonSiguiente').style.display = 'none';
+    document.getElementById('codigoManual').value = '';
     procesando = false;
-
     iniciarCamara();
   }
 
 
-  /*
+  /* ------------------------------------------------------------
    * PROTEGER TEXTO HTML
-   */
+   * ---------------------------------------------------------- */
   function escapeHTML(texto) {
-
-    const div =
-      document.createElement('div');
-
-    div.textContent =
-      texto || '';
-
+    const div = document.createElement('div');
+    div.textContent = texto || '';
     return div.innerHTML;
   }
 
