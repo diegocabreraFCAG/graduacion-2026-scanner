@@ -180,7 +180,7 @@
    * editar → nueva versión" para conservar esta MISMA URL.
    * ============================================================ */
   const API_URL =
-    'https://script.google.com/macros/s/AKfycbwQddsI26ILiRRp_N2VTOfrF1ngNvwa7f80ywH-fQeIwHh_-Rz1tZvm8x4tP1tGkC9J/exec';
+    'https://script.google.com/macros/s/AKfycbwzkzrCx5H-fJyRyCCse7tI_RHswKyGt7tLXyAw2-3e3iPh-h2mXLKjhXeohpKRx8ni/exec';
 
   const TIMEOUT_MS = 20000;
 
@@ -273,9 +273,10 @@
   /* ------------------------------------------------------------
    * VERIFICAR CÓDIGO (una sola implementación, vía JSONP)
    * ---------------------------------------------------------- */
-  function verificarCodigo(codigo) {
+  function verificarCodigo(codigo, intento) {
 
-    codigo = String(codigo).trim().toUpperCase();
+    codigo  = String(codigo).trim().toUpperCase();
+    intento = intento || 1;   // 1 = primer envío, 2 = reintento automático
 
     if (!codigo) {
       mostrarError('Debe ingresar un código.');
@@ -283,7 +284,7 @@
       return;
     }
 
-    mostrarCargando();
+    if (intento === 1) mostrarCargando();
 
     const callback = 'respuestaQR_' + Date.now() +
                      '_' + Math.floor(Math.random() * 100000);
@@ -306,17 +307,26 @@
       mostrarResultado(resultado, codigo);
     };
 
-    // Falla de conexión / carga
+    /*
+     * Falla de CARGA/RED (no llegó respuesta).
+     * Como el <script> no cargó, es muy probable que la petición
+     * NO haya llegado al servidor -> es seguro reintentar 1 vez.
+     * (No reintentamos en timeout: ahí sí pudo haberse registrado.)
+     */
     script.onerror = function() {
       if (terminado) return;
       terminado = true;
       limpiar();
-      mostrarError(
-        'No fue posible comunicarse con el sistema. Verifique la conexión.'
-      );
+      if (intento < 2) {
+        setTimeout(function() { verificarCodigo(codigo, intento + 1); }, 400);
+      } else {
+        mostrarError(
+          'No fue posible comunicarse con el sistema. Verifique la conexión.'
+        );
+      }
     };
 
-    // Tiempo máximo de espera
+    // Tiempo máximo de espera (sin reintento: la escritura pudo completarse)
     const timeout = setTimeout(function() {
       if (terminado) return;
       terminado = true;
