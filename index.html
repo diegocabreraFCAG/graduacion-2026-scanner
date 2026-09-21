@@ -71,6 +71,7 @@
     .boton-camara    { background: #d0242e; color: white; }
     .boton-manual    { background: #494949; color: white; }
     .boton-siguiente { background: #5794cd; color: white; display: none; }
+    .boton-precalentar { background: #6f7d8c; color: white; font-size: 14px; padding: 12px; }
 
     .enlace-manual {
       display: block;
@@ -160,6 +161,10 @@
         📷 ESCANEAR SIGUIENTE
       </button>
 
+      <button id="botonPrecalentar" class="boton-precalentar" onclick="precalentarSistema()">
+        ⚡ Precalentar sistema (antes de abrir puertas)
+      </button>
+
       <div id="resultado"></div>
 
     </div>
@@ -180,7 +185,7 @@
    * editar → nueva versión" para conservar esta MISMA URL.
    * ============================================================ */
   const API_URL =
-    'https://script.google.com/macros/s/AKfycbyPyA9UiT24hu0BFAwVvYWt6eZcHL-2pKBjLqcHeArVxHnXOXTBhGZUnKzZHCaGzA/exec';
+    'https://script.google.com/macros/s/AKfycbyX99FE6FN1Lu_9UvLYU0fIG4x3E3jkBA4kdqZxtz4L2g_wiIz_VzVKt4HtpfEzdgDc/exec';
 
   const TIMEOUT_MS = 20000;
 
@@ -476,6 +481,73 @@
 
 
   /* ------------------------------------------------------------
+   * PRECALENTAR EL SISTEMA (botón, antes de abrir puertas)
+   * ---------------------------------------------------------- */
+  function precalentarSistema() {
+
+    const caja = document.getElementById('resultado');
+    caja.style.display = 'block';
+    caja.className = 'cargando';
+    caja.innerHTML = '<h2>PRECALENTANDO…</h2><p>Preparando el sistema, espere…</p>';
+
+    const callback = 'preQR_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const script   = document.createElement('script');
+    let   terminado = false;
+
+    function limpiar() {
+      clearTimeout(timeout);
+      try { delete window[callback]; } catch (e) { window[callback] = undefined; }
+      if (script.parentNode) script.remove();
+    }
+
+    window[callback] = function(res) {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      if (res && res.ok) {
+        caja.className = 'valido';
+        caja.innerHTML =
+          '<h2>✅ SISTEMA LISTO</h2>' +
+          '<p>' + (res.total || 0) + ' códigos preparados' +
+          (res.segundos != null ? ' en ' + res.segundos + ' s' : '') + '.</p>' +
+          '<p>Ya puede empezar a escanear.</p>';
+      } else {
+        caja.className = 'error';
+        caja.innerHTML =
+          '<h2>ERROR</h2><p>' +
+          escapeHTML((res && res.mensaje) || 'No se pudo precalentar.') +
+          '</p>';
+      }
+    };
+
+    script.onerror = function() {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      caja.className = 'error';
+      caja.innerHTML = '<h2>ERROR</h2><p>No fue posible comunicarse con el sistema.</p>';
+    };
+
+    // Precalentar puede tardar más que un escaneo normal (arranque + índice)
+    const timeout = setTimeout(function() {
+      if (terminado) return;
+      terminado = true;
+      limpiar();
+      caja.className = 'error';
+      caja.innerHTML = '<h2>ERROR</h2><p>El sistema tardó demasiado. Intente de nuevo.</p>';
+    }, 30000);
+
+    script.src =
+      API_URL +
+      '?action=precalentar' +
+      '&callback=' + callback +
+      '&_=' + Date.now();
+
+    document.body.appendChild(script);
+  }
+
+
+  /* ------------------------------------------------------------
    * PROTEGER TEXTO HTML
    * ---------------------------------------------------------- */
   function escapeHTML(texto) {
@@ -488,3 +560,4 @@
 
 </body>
 </html>
+
