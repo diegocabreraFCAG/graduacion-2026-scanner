@@ -185,7 +185,7 @@
    * editar → nueva versión" para conservar esta MISMA URL.
    * ============================================================ */
   const API_URL =
-    'https://script.google.com/macros/s/AKfycbyX99FE6FN1Lu_9UvLYU0fIG4x3E3jkBA4kdqZxtz4L2g_wiIz_VzVKt4HtpfEzdgDc/exec';
+    'https://script.google.com/macros/s/AKfycbzxvNZ-nyQwMsO7okkfzeAzRKeXaLkMUlbrsJLObCVS2_6osSBCJgrBJZhLUKQR1Fg/exec';
 
   const TIMEOUT_MS = 20000;
 
@@ -322,8 +322,8 @@
       if (terminado) return;
       terminado = true;
       limpiar();
-      if (intento < 2) {
-        setTimeout(function() { verificarCodigo(codigo, intento + 1); }, 400);
+      if (intento < 4) {
+        setTimeout(function() { verificarCodigo(codigo, intento + 1); }, 500);
       } else {
         mostrarError(
           'No fue posible comunicarse con el sistema.<br><br>' +
@@ -483,12 +483,17 @@
   /* ------------------------------------------------------------
    * PRECALENTAR EL SISTEMA (botón, antes de abrir puertas)
    * ---------------------------------------------------------- */
-  function precalentarSistema() {
+  function precalentarSistema(intento) {
+
+    intento = intento || 1;
+    const MAX = 5;   // precalentar es idempotente: seguro reintentar
 
     const caja = document.getElementById('resultado');
     caja.style.display = 'block';
     caja.className = 'cargando';
-    caja.innerHTML = '<h2>PRECALENTANDO…</h2><p>Preparando el sistema, espere…</p>';
+    caja.innerHTML = '<h2>PRECALENTANDO…</h2><p>Preparando el sistema' +
+                     (intento > 1 ? ' (intento ' + intento + ' de ' + MAX + ')' : '') +
+                     ', espere…</p>';
 
     const callback = 'preQR_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
     const script   = document.createElement('script');
@@ -498,6 +503,17 @@
       clearTimeout(timeout);
       try { delete window[callback]; } catch (e) { window[callback] = undefined; }
       if (script.parentNode) script.remove();
+    }
+
+    // Reintenta (arranque en frío) o, si ya se agotaron los intentos, muestra error
+    function reintentarOFallar() {
+      if (intento < MAX) {
+        setTimeout(function() { precalentarSistema(intento + 1); }, 600);
+      } else {
+        caja.className = 'error';
+        caja.innerHTML = '<h2>ERROR</h2><p>No se pudo preparar el sistema tras ' +
+                         'varios intentos. Verifique la conexión e intente de nuevo.</p>';
+      }
     }
 
     window[callback] = function(res) {
@@ -512,11 +528,7 @@
           (res.segundos != null ? ' en ' + res.segundos + ' s' : '') + '.</p>' +
           '<p>Ya puede empezar a escanear.</p>';
       } else {
-        caja.className = 'error';
-        caja.innerHTML =
-          '<h2>ERROR</h2><p>' +
-          escapeHTML((res && res.mensaje) || 'No se pudo precalentar.') +
-          '</p>';
+        reintentarOFallar();
       }
     };
 
@@ -524,18 +536,16 @@
       if (terminado) return;
       terminado = true;
       limpiar();
-      caja.className = 'error';
-      caja.innerHTML = '<h2>ERROR</h2><p>No fue posible comunicarse con el sistema.</p>';
+      reintentarOFallar();
     };
 
-    // Precalentar puede tardar más que un escaneo normal (arranque + índice)
+    // Timeout por intento (más corto, porque reintenta solo)
     const timeout = setTimeout(function() {
       if (terminado) return;
       terminado = true;
       limpiar();
-      caja.className = 'error';
-      caja.innerHTML = '<h2>ERROR</h2><p>El sistema tardó demasiado. Intente de nuevo.</p>';
-    }, 30000);
+      reintentarOFallar();
+    }, 15000);
 
     script.src =
       API_URL +
@@ -560,4 +570,3 @@
 
 </body>
 </html>
-
